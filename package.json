@@ -1,0 +1,15 @@
+{
+  "name": "sprite-qa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offline batch QA for visual-novel character sprite variants",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/build.mjs --check",
+    "test": "node --test"
+  }
+}
