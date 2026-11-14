@@ -1,0 +1,1336 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src blob: data:; connect-src 'none'; base-uri 'none'; form-action 'none';">
+  <title>Sprite QA · 立绘差分验收</title>
+  <style>
+:root {
+  color-scheme: light;
+  --ink: #201c30;
+  --muted: #686277;
+  --muted-light: #817a91;
+  --line: #e8e3ed;
+  --paper: #fff;
+  --backdrop: #f7f5fa;
+  --accent: #6446b6;
+  --accent-dark: #513597;
+  --accent-pale: #ede7fa;
+  --inside: #35d3b6;
+  --outside: #fa8c9a;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-family: "Inter", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; min-width: 300px; color: var(--ink); background: var(--backdrop); }
+button, select, input { font: inherit; }
+button { cursor: pointer; }
+button:disabled, select:disabled, input:disabled { cursor: default; opacity: .48; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #7b59cd; outline-offset: 3px; }
+button, h1, h2, p { margin: 0; }
+svg { display: block; width: 17px; height: 17px; flex: none; }
+
+.topbar { background: var(--paper); border-bottom: 1px solid var(--line); }
+.topbar-inner, main { max-width: 1280px; margin-inline: auto; padding-inline: 38px; }
+.topbar-inner { height: 69px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 780; letter-spacing: -.045em; font-size: 22px; white-space: nowrap; }
+.brand-accent { color: var(--accent-dark); }
+.brand-mark { width: 36px; height: 36px; display: grid; place-items: center; color: #fff; background: #6b4ab9; border-radius: 10px; }
+.brand-mark svg { width: 26px; height: 26px; }
+.header-actions, .result-actions { display: flex; align-items: center; gap: 9px; }
+.button {
+  min-height: 37px; display: inline-flex; align-items: center; justify-content: center;
+  gap: 7px; padding: 0 12px; border: 1px solid transparent; border-radius: 8px; font-size: 13px;
+  font-weight: 650; white-space: nowrap; line-height: 1.25;
+}
+.button-primary { background: var(--accent); color: #fff; padding-inline: 14px; }
+.button-primary:hover:not(:disabled) { background: var(--accent-dark); }
+.button-quiet { background: transparent; color: #564a6d; }
+.button-quiet:hover:not(:disabled), .button-outline:hover:not(:disabled) { background: #f5f1fc; }
+.button-outline { background: #fff; color: #514762; border-color: #ded6e8; }
+.button-outline[aria-pressed="true"] { color: var(--accent-dark); border-color: #c8b4ec; background: var(--accent-pale); }
+
+main { padding-block: 36px 22px; }
+.intro { display: flex; align-items: end; justify-content: space-between; gap: 15px; margin-bottom: 25px; }
+h1 { font-size: clamp(30px, 4vw, 40px); font-weight: 800; line-height: 1.22; letter-spacing: -.055em; }
+.intro p { margin-top: 9px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.dataset-label { padding: 5px 10px; border: 1px solid #e0d7ef; border-radius: 6px; color: #594984; background: #f2edf9; font-size: 12px; white-space: nowrap; }
+.notice { padding: 11px 14px; margin-bottom: 15px; border: 1px solid #ded2f0; border-radius: 8px; background: #f0e9fa; color: #513d78; font-size: 13px; line-height: 1.55; }
+.drop-zone { position: fixed; inset: 12px; z-index: 2; display: grid; place-items: center; padding: 24px; text-align: center; border: 3px dashed #9166dc; border-radius: 16px; background: #2a1935ef; color: #fff; font-size: clamp(16px, 4vw, 28px); pointer-events: none; }
+
+.workspace-grid { display: grid; grid-template-columns: minmax(0, 1fr) 318px; gap: 16px; align-items: start; }
+.panel { min-width: 0; border: 1px solid var(--line); background: var(--paper); border-radius: 13px; }
+.panel-header { display: flex; align-items: center; min-height: 65px; padding: 13px 17px; gap: 10px; border-bottom: 1px solid var(--line); }
+.panel-header h2 { font-size: 16px; line-height: 1.35; letter-spacing: -.02em; font-weight: 760; }
+.preview-header { justify-content: space-between; }
+.preview-title { min-width: 0; }
+.preview-name, .results-summary { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.preview-name { text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+.mode-control { display: flex; gap: 2px; padding: 3px; background: #f3eff8; border-radius: 8px; flex: none; }
+.mode-control button { border: 0; border-radius: 5px; padding: 6px 9px; min-height: 29px; background: transparent; color: #665c79; white-space: nowrap; font-size: 12px; line-height: 1.25; }
+.mode-control button[aria-pressed="true"] { color: #50368c; background: #fff; font-weight: 720; box-shadow: 0 1px 3px #3c245526; }
+.mode-control button:hover:not(:disabled) { color: #412474; }
+.preview-area {
+  position: relative; min-height: clamp(305px, 34vw, 451px);
+  display: grid; place-items: center; padding: 19px; overflow: hidden;
+  background-color: #262338;
+  background-image: linear-gradient(45deg, #2d2940 25%, transparent 25%, transparent 75%, #2d2940 75%),
+    linear-gradient(45deg, #2d2940 25%, transparent 25%, transparent 75%, #2d2940 75%);
+  background-size: 24px 24px; background-position: 0 0, 12px 12px;
+}
+.preview-guides { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, #a98dce0c, #15112050); }
+.preview-area p { position: relative; z-index: 1; padding: 11px 13px; background: #242034; border: 1px solid #4b415e; border-radius: 7px; color: #efe8ff; font-size: 13px; text-align: center; }
+.stage { position: relative; }
+#canvas { display: block; width: 100%; height: 100%; }
+.region-box { position: absolute; border: 1px dashed #d8c5ff; background: #d3abff0b; pointer-events: none; box-shadow: 0 0 0 1px #1c122a65; }
+.region-box span { position: absolute; bottom: calc(100% + 4px); left: 0; white-space: nowrap; padding: 3px 5px; color: #fcf6ff; border-radius: 3px; background: #594079; font-size: 10px; line-height: 1.25; }
+.region-box.label-below span { bottom: auto; top: calc(100% + 4px); }
+.draw-layer { position: absolute; inset: 0; touch-action: none; cursor: crosshair; }
+.split-line { position: absolute; top: 0; bottom: 0; width: 2px; background: #ecdefc; pointer-events: none; }
+.split-controls { display: flex; align-items: center; gap: 10px; padding: 7px 16px 0; font-size: 12px; color: var(--muted); }
+.preview-footer { min-height: 42px; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 15px; border-top: 1px solid #494059; font-size: 12px; color: #ded2ed; background: #30283f; border-radius: 0 0 12px 12px; }
+.preview-panel:has(.split-controls:not([hidden])) .preview-footer { margin-top: 7px; }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.swatch { width: 8px; height: 8px; border-radius: 2px; }
+.swatch-inside { background: var(--inside); }
+.swatch-outside { background: var(--outside); }
+.preview-size { font: 11px var(--mono); white-space: nowrap; margin-left: auto; }
+
+.rules-heading { padding-inline: 16px; }
+.rules-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--accent-pale); color: var(--accent-dark); }
+.rules-icon svg { width: 19px; height: 19px; }
+.rules-body { padding: 16px; }
+.field-title { display: block; color: #393149; font-size: 13px; font-weight: 700; line-height: 1.4; }
+select, input[type="number"] { width: 100%; min-height: 37px; border: 1px solid #ded8e6; border-radius: 7px; padding: 6px 8px; background: #fcfbfe; color: #342a45; font-size: 13px; }
+select { margin-top: 8px; }
+.region-heading { display: flex; justify-content: space-between; align-items: center; gap: 4px; margin-top: 18px; }
+.region-heading .button { min-height: 31px; padding-inline: 8px; font-size: 12px; }
+.region-heading svg { width: 15px; height: 15px; }
+.region-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+.region-fields label { color: var(--muted); font-size: 11px; line-height: 1.4; }
+.region-fields input { min-height: 34px; margin-top: 4px; padding: 4px; text-align: center; font: 12px var(--mono); appearance: textfield; }
+.region-fields input::-webkit-inner-spin-button, .region-fields input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.field-feedback { margin-top: 7px; color: #8f344c; font-size: 11px; line-height: 1.45; }
+.region-actions { margin-top: 7px; display: flex; justify-content: space-between; }
+.text-button { padding: 4px 0; min-height: 28px; border: 0; background: transparent; color: var(--muted); font-size: 12px; }
+.text-button:hover:not(:disabled) { text-decoration: underline; }
+.text-primary { color: var(--accent-dark); font-weight: 700; }
+.rule-separator { border-top: 1px solid var(--line); margin: 10px 0 14px; }
+.slider-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.slider-label output { padding: 3px 5px; border-radius: 5px; color: #513f73; background: #f2edf9; white-space: nowrap; font: 11px var(--mono); }
+.second-slider { margin-top: 11px; }
+input[type="range"] { width: 100%; margin: 6px 0 0; height: 17px; accent-color: var(--accent); cursor: pointer; }
+.split-controls input[type="range"] { margin: 0; }
+.rule-hint { color: var(--muted); margin-top: 9px; font-size: 11px; line-height: 1.6; }
+
+.results-panel { grid-column: 1 / -1; }
+.results-header { justify-content: space-between; }
+.results-header .button { min-height: 33px; font-size: 12px; }
+.table-wrap { overflow: auto; }
+table { width: 100%; min-width: 620px; border-collapse: collapse; text-align: left; }
+th, td { padding: 8px 13px; }
+th:first-child, td:first-child { padding-left: 17px; width: 36%; }
+th { background: #faf8fc; color: #655d73; font-size: 12px; font-weight: 670; }
+td { color: #473e57; font-size: 13px; line-height: 1.4; }
+tbody tr { border-top: 1px solid #f0edf4; }
+tbody tr.is-selected { background: #f5f0fc; box-shadow: inset 3px 0 #916bda; }
+tbody tr:has(button):hover { background: #f9f6fc; }
+.row-file { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
+.row-file svg { width: 16px; height: 16px; color: #8774a3; }
+.row-file span { overflow-wrap: anywhere; }
+button.row-file { border: 0; padding: 3px 0; background: transparent; color: #382a56; text-align: left; font-size: 13px; font-weight: 650; }
+button.row-file:hover { text-decoration: underline; }
+.metric { white-space: nowrap; font: 12px var(--mono); font-variant-numeric: tabular-nums; }
+.metric-alert { color: #94324b; font-weight: 700; }
+.status-tag { display: inline-block; padding: 3px 7px; border-radius: 5px; white-space: nowrap; font-size: 11px; font-weight: 700; }
+.status-reference { background: #efebf7; color: #665184; }
+.status-pass { background: #e1f3e8; color: #225e48; }
+.status-review { background: #f9edd9; color: #79491f; }
+.status-error { background: #fbe7eb; color: #8c3247; }
+.status-pending { background: #f3eff6; color: #675a76; }
+.no-results { padding: 14px 17px; color: var(--muted); font-size: 13px; }
+.page-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 1px 0; color: var(--muted); font-size: 11px; }
+.page-footer span:first-child { display: flex; align-items: center; gap: 5px; }
+.page-footer svg { width: 13px; height: 13px; }
+
+@media (max-width: 850px) {
+  .topbar-inner, main { padding-inline: 22px; }
+  .workspace-grid { grid-template-columns: minmax(0, 1fr) 265px; gap: 12px; }
+  .panel-header { padding-inline: 12px; }
+  .rules-body { padding: 12px; }
+}
+@media (max-width: 690px) {
+  .topbar-inner, main { padding-inline: 15px; }
+  .topbar-inner { height: 60px; }
+  main { padding-top: 24px; }
+  .workspace-grid { grid-template-columns: minmax(0, 1fr); }
+  .intro { margin-bottom: 18px; align-items: start; }
+  .intro p { font-size: 13px; }
+  .dataset-label { margin-top: 4px; }
+  .preview-area { min-height: 345px; }
+}
+@media (max-width: 380px) {
+  .brand { font-size: 19px; gap: 6px; }
+  .brand-mark { width: 29px; height: 29px; }
+  .brand-mark svg { width: 22px; height: 22px; }
+  .header-actions { gap: 2px; }
+  .header-actions .button { padding-inline: 7px; }
+  .preview-header { align-items: start; flex-direction: column; }
+  .preview-title { width: 100%; }
+  .preview-area { min-height: 290px; }
+}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none"><path d="M16 5.5 26.5 12 16 18.5 5.5 12 16 5.5Z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="m5.5 16.5 10.5 6.4 10.5-6.4M5.5 21 16 27.4 26.5 21" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span>Sprite<span class="brand-accent"> QA</span></span>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="demo" class="button button-quiet">加载演示</button>
+        <button type="button" id="import" class="button button-primary"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 16v4h16v-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>导入素材</button>
+        <input type="file" id="files" accept=".png,.webp,image/png,image/webp" multiple hidden>
+      </div>
+    </div>
+  </header>
+
+  <main id="workspace">
+    <div class="intro">
+      <div>
+        <h1>立绘差分验收</h1>
+        <p>选定基准立绘，框出允许变化的区域，批量复核其余像素。</p>
+      </div>
+      <span id="dataset-label" class="dataset-label" hidden></span>
+    </div>
+    <p id="notice" class="notice" role="status" hidden></p>
+    <p id="drop-zone" class="drop-zone" hidden>松开鼠标导入 PNG 或 WebP 立绘</p>
+
+    <div class="workspace-grid">
+      <section class="panel preview-panel" aria-labelledby="preview-heading">
+        <header class="panel-header preview-header">
+          <div class="preview-title">
+            <h2 id="preview-heading">对照预览</h2>
+            <p id="preview-name" class="preview-name">等待导入立绘</p>
+          </div>
+          <div class="mode-control" role="group" aria-label="预览方式">
+            <button type="button" data-mode="diff" aria-pressed="true">差分</button>
+            <button type="button" data-mode="split" aria-pressed="false">分屏</button>
+            <button type="button" data-mode="base" aria-pressed="false">基准</button>
+            <button type="button" data-mode="candidate" aria-pressed="false">待检图</button>
+          </div>
+        </header>
+        <div class="preview-area">
+          <div class="preview-guides" aria-hidden="true"></div>
+          <p id="preview-message">从右上角导入素材，或载入演示。</p>
+          <div id="stage" class="stage" hidden>
+            <canvas id="canvas" role="img" aria-label="立绘对照图"></canvas>
+            <span id="split-line" class="split-line" aria-hidden="true" hidden></span>
+            <span id="region-box" class="region-box" aria-hidden="true" hidden><span>允许变化区域</span></span>
+            <div id="draw-layer" class="draw-layer" aria-hidden="true" hidden></div>
+          </div>
+        </div>
+        <div class="split-controls" id="split-controls" hidden>
+          <span>基准</span><input type="range" id="split" min="0" max="100" value="50" aria-label="分屏位置"><span>待检图</span>
+        </div>
+        <footer class="preview-footer">
+          <div id="legend" class="legend"><span><i class="swatch swatch-inside"></i>区域内变化</span><span><i class="swatch swatch-outside"></i>区域外变化</span></div>
+          <span id="preview-size" class="preview-size"></span>
+        </footer>
+      </section>
+
+      <section class="panel rules-panel" aria-labelledby="rules-heading">
+        <header class="panel-header rules-heading">
+          <div class="rules-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 7h14M5 12h14M5 17h14M9 5v4m6 1v4m-5 1v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+          <h2 id="rules-heading">验收规则</h2>
+        </header>
+        <div class="rules-body">
+          <label class="field-title" for="base">基准立绘</label>
+          <select id="base" disabled><option>等待导入</option></select>
+
+          <div class="region-heading">
+            <span id="region-label" class="field-title">允许变化区域</span>
+            <button type="button" id="draw" class="button button-outline" aria-pressed="false" disabled>
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5M12 8v8m-4-4h8" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>框选
+            </button>
+          </div>
+          <div id="region-fields" class="region-fields" role="group" aria-labelledby="region-label">
+            <label>X<input type="number" id="region-x" min="0" step="1" inputmode="numeric" disabled></label>
+            <label>Y<input type="number" id="region-y" min="0" step="1" inputmode="numeric" disabled></label>
+            <label>宽<input type="number" id="region-w" min="1" step="1" inputmode="numeric" disabled></label>
+            <label>高<input type="number" id="region-h" min="1" step="1" inputmode="numeric" disabled></label>
+          </div>
+          <p id="region-feedback" class="field-feedback" aria-live="polite" hidden></p>
+          <div class="region-actions">
+            <button type="button" id="clear-region" class="text-button" disabled>清除区域</button>
+            <button type="button" id="apply-region" class="text-button text-primary" disabled>应用坐标</button>
+          </div>
+
+          <div class="rule-separator"></div>
+          <div class="slider-label">
+            <label class="field-title" for="delta">像素差阈值</label>
+            <output id="delta-value" for="delta">12 / 255</output>
+          </div>
+          <input type="range" id="delta" min="0" max="255" value="12">
+          <div class="slider-label second-slider">
+            <label class="field-title" for="limit">区域外允许变化</label>
+            <output id="limit-value" for="limit">0.25%</output>
+          </div>
+          <input type="range" id="limit" min="0" max="1000" value="25">
+          <p class="rule-hint">区域外变化率以两张图在区域外的可见像素并集为分母。</p>
+        </div>
+      </section>
+
+      <section class="panel results-panel" aria-labelledby="results-heading">
+        <header class="panel-header results-header">
+          <div>
+            <h2 id="results-heading">检查结果</h2>
+            <p id="summary" class="results-summary" role="status">导入至少两张图片开始对照。</p>
+          </div>
+          <div class="result-actions">
+            <button type="button" id="filter" class="button button-outline" aria-pressed="false" disabled>仅待处理</button>
+            <button type="button" id="export" class="button button-outline" disabled><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v12m-4-4 4 4 4-4M4 17v3h16v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>导出 JSON</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">文件</th><th scope="col">画布</th><th scope="col">区域内变化</th><th scope="col">区域外变化</th><th scope="col">状态</th></tr></thead>
+            <tbody id="results"></tbody>
+          </table>
+          <p id="no-results" class="no-results" hidden>当前没有需要处理的文件。</p>
+        </div>
+      </section>
+    </div>
+
+    <footer class="page-footer">
+      <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>素材仅在当前浏览器中处理</span>
+      <span>PNG / WebP</span>
+    </footer>
+  </main>
+  <script>
+"use strict";
+
+const SpriteQA = (() => {
+  const MAX_PIXELS = 16_777_216;
+  const MAX_SIDE = 8_192;
+  const MAX_BYTES = 64 * 1024 * 1024;
+  const DEFAULT_SETTINGS = Object.freeze({ delta: 12, outsideLimit: 25 });
+  const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+
+  function formatError(code) {
+    throw Object.assign(new Error(code), { code });
+  }
+
+  function fourCC(bytes, offset) {
+    return String.fromCharCode(...bytes.subarray(offset, offset + 4));
+  }
+
+  function pngSize(bytes, view) {
+    if (bytes.length < 33 || view.getUint32(8) !== 13 || fourCC(bytes, 12) !== "IHDR") {
+      formatError("invalid-header");
+    }
+    let offset = 8;
+    while (offset + 12 <= bytes.length) {
+      const length = view.getUint32(offset);
+      if (length > bytes.length - offset - 12) formatError("invalid-header");
+      const type = fourCC(bytes, offset + 4);
+      if (type === "acTL") formatError("animated");
+      if (type === "IDAT") {
+        return { width: view.getUint32(16), height: view.getUint32(20) };
+      }
+      if (type === "IEND") break;
+      offset += length + 12;
+    }
+    formatError("invalid-header");
+  }
+
+  function webpSize(bytes, view) {
+    const end = view.getUint32(4, true) + 8;
+    if (end > bytes.length || end < 20) formatError("invalid-header");
+    let canvas = null;
+    let frame = null;
+    for (let offset = 12; offset + 8 <= end;) {
+      const type = fourCC(bytes, offset);
+      const length = view.getUint32(offset + 4, true);
+      const start = offset + 8;
+      if (length + (length % 2) > end - start) formatError("invalid-header");
+      if (type === "ANIM" || type === "ANMF") formatError("animated");
+      if (type === "VP8X") {
+        if (length !== 10) formatError("invalid-header");
+        if (bytes[start] & 0x02) formatError("animated");
+        const read24 = (at) => bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16);
+        canvas = { width: read24(start + 4) + 1, height: read24(start + 7) + 1 };
+      }
+      if (type === "VP8 ") {
+        if (length < 10 || bytes[start + 3] !== 0x9d ||
+            bytes[start + 4] !== 0x01 || bytes[start + 5] !== 0x2a) {
+          formatError("invalid-header");
+        }
+        frame = {
+          width: view.getUint16(start + 6, true) & 0x3fff,
+          height: view.getUint16(start + 8, true) & 0x3fff,
+        };
+      }
+      if (type === "VP8L") {
+        if (length < 5 || bytes[start] !== 0x2f) formatError("invalid-header");
+        const size = view.getUint32(start + 1, true);
+        frame = { width: (size & 0x3fff) + 1, height: ((size >>> 14) & 0x3fff) + 1 };
+      }
+      offset = start + length + (length % 2);
+    }
+    if (!frame || (canvas && (canvas.width !== frame.width || canvas.height !== frame.height))) {
+      formatError("invalid-header");
+    }
+    return canvas || frame;
+  }
+
+  function imageHeader(buffer, filename) {
+    if (buffer.byteLength > MAX_BYTES) formatError("file-too-large");
+    const bytes = new Uint8Array(buffer);
+    const view = new DataView(buffer);
+    let format;
+    let size;
+    if (PNG_SIGNATURE.every((byte, index) => bytes[index] === byte)) {
+      format = "png";
+      size = pngSize(bytes, view);
+    } else if (fourCC(bytes, 0) === "RIFF" && fourCC(bytes, 8) === "WEBP") {
+      format = "webp";
+      size = webpSize(bytes, view);
+    } else {
+      formatError("unsupported-format");
+    }
+    if (!filename.toLowerCase().endsWith("." + format)) formatError("extension-mismatch");
+    if (!size.width || !size.height) formatError("invalid-header");
+    if (size.width > MAX_SIDE || size.height > MAX_SIDE || size.width * size.height > MAX_PIXELS) {
+      formatError("canvas-too-large");
+    }
+    return { format, ...size };
+  }
+
+  function alphaStatus(pixels) {
+    let visible = false;
+    let transparent = false;
+    for (let i = 3; i < pixels.length; i += 4) {
+      visible ||= pixels[i] > 0;
+      transparent ||= pixels[i] < 255;
+      if (visible && transparent) return "ok";
+    }
+    return visible ? "opaque" : "empty-image";
+  }
+
+  function validRegion(region, width, height) {
+    if (region === null) return true;
+    const { x, y, width: w, height: h } = region;
+    return [x, y, w, h].every(Number.isInteger) && x >= 0 && y >= 0 && w > 0 && h > 0 &&
+      x + w <= width && y + h <= height;
+  }
+
+  function comparePixels(base, candidate, width, height, region, delta, withMask = false) {
+    if (base.length !== width * height * 4 || base.length !== candidate.length ||
+        !validRegion(region, width, height) || !Number.isInteger(delta) || delta < 0 || delta > 255) {
+      throw new RangeError("Incompatible pixel buffers or comparison settings");
+    }
+    const mask = withMask ? new Uint8Array(width * height) : null;
+    const inside = { changed: 0, compared: 0 };
+    const outside = { changed: 0, compared: 0 };
+    const left = region?.x ?? 0;
+    const right = left + (region?.width ?? 0);
+    const top = region?.y ?? 0;
+    const bottom = top + (region?.height ?? 0);
+    const scaledDelta = delta * 255;
+    for (let y = 0, i = 0; y < height; y++) {
+      const inRegionRow = y >= top && y < bottom;
+      for (let x = 0; x < width; x++, i += 4) {
+        const a = base[i + 3];
+        const b = candidate[i + 3];
+        if (!(a | b)) continue;
+        const inRegion = inRegionRow && x >= left && x < right;
+        const counts = inRegion ? inside : outside;
+        counts.compared++;
+        const changed = Math.abs(a - b) > delta ||
+          Math.abs(base[i] * a - candidate[i] * b) > scaledDelta ||
+          Math.abs(base[i + 1] * a - candidate[i + 1] * b) > scaledDelta ||
+          Math.abs(base[i + 2] * a - candidate[i + 2] * b) > scaledDelta;
+        if (changed) {
+          counts.changed++;
+          if (mask) mask[i / 4] = inRegion ? 1 : 2;
+        }
+      }
+    }
+    return { inside, outside, mask };
+  }
+
+  function assessment(outside, outsideLimit) {
+    if (outside.compared === 0) return { status: "review", issue: "no-outside-pixels" };
+    if (outside.changed * 10_000 > outside.compared * outsideLimit) {
+      return { status: "review", issue: "outside-changes" };
+    }
+    return { status: "pass", issue: null };
+  }
+
+  return { MAX_BYTES, DEFAULT_SETTINGS, imageHeader, alphaStatus, validRegion, comparePixels, assessment };
+})();
+
+if (typeof module !== "undefined") module.exports = SpriteQA;
+
+"use strict";
+
+const DEMO_REGION = Object.freeze({ x: 140, y: 160, width: 142, height: 122 });
+
+function demoPortrait({ expression = "neutral", sleeve = false, shift = 0, width = 420,
+  height = 540, opaque = false } = {}) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (opaque) {
+    ctx.fillStyle = "#f1eee8";
+    ctx.fillRect(0, 0, width, height);
+  }
+  ctx.translate(shift, 0);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  const path = (outline, fill, stroke = "#29233e", weight = 2.4) => {
+    const shape = new Path2D(outline);
+    if (fill) {
+      ctx.fillStyle = fill;
+      ctx.fill(shape);
+    }
+    if (stroke) {
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = weight;
+      ctx.stroke(shape);
+    }
+  };
+  const gradient = (x1, y1, x2, y2, start, end) => {
+    const paint = ctx.createLinearGradient(x1, y1, x2, y2);
+    paint.addColorStop(0, start);
+    paint.addColorStop(1, end);
+    return paint;
+  };
+  const hair = gradient(120, 74, 302, 403, "#3d3454", "#211d35");
+  const skin = gradient(168, 138, 245, 284, "#ffdfcb", "#e3a495");
+  const jacket = gradient(108, 336, 285, 529, "#716483", "#46405f");
+  const leftSleeve = sleeve ? gradient(73, 365, 147, 518, "#bb7273", "#783e58") : jacket;
+
+  path("M128 121 C140 68 180 48 222 54 C277 51 309 94 315 149 L331 350 Q324 390 355 436 Q318 430 304 407 Q308 427 318 451 Q278 436 265 405 L147 416 Q114 449 82 440 Q108 405 109 373 Z", hair);
+  path("M112 343 Q123 331 163 318 L187 308 L233 307 L258 319 Q298 330 308 344 C330 356 338 382 350 432 L369 514 Q330 526 280 526 L138 526 Q82 525 51 514 L70 433 Q86 363 112 343 Z", jacket);
+  path("M114 346 Q92 358 81 394 L51 514 Q87 525 126 525 L145 472 Q147 443 153 413 Z", leftSleeve);
+  path("M307 345 Q329 363 339 401 L369 514 Q327 525 291 525 L274 478 Q268 441 266 414 Z", jacket);
+  path("M127 414 Q118 438 111 471 L106 506 M297 417 Q303 449 308 465 L313 506", null, "#3f3656", 2);
+  path("M145 350 Q156 332 178 320 L243 320 Q263 330 278 351 L259 481 L261 525 L156 525 L161 485 Z", gradient(154, 335, 254, 523, "#f6edf1", "#b8aabe"));
+  path("M181 273 L181 313 Q185 325 170 329 L211 358 L250 329 Q233 323 239 307 L240 271 Z", skin);
+  path("M182 282 Q210 305 238 292 L237 308 Q207 324 182 308 Z", "#d59892", null);
+  path("M174 321 L211 347 L190 372 L155 343 Z M245 320 L211 347 L232 372 L266 343 Z", "#f9edf4");
+  path("M208 351 Q188 333 160 354 L164 389 Q185 393 209 365 Q234 393 257 389 L264 354 Q233 332 215 351 Z", gradient(172, 344, 247, 398, "#e0b779", "#a86b55"));
+  path("M198 362 L171 414 L191 409 L197 421 L212 366 L230 416 L239 406 L252 412 L225 362 Z", "#b88161");
+  path("M202 349 Q211 345 221 350 L222 366 Q211 370 202 366 Z", "#e1ad71");
+  path("M146 363 L165 407 L168 467 L158 524 M275 363 L257 407 L254 467 L262 524", null, "#8e7b9b", 2.2);
+  path("M71 493 L126 505 L122 523 M294 505 L351 493 L361 515", null, "#8e7b9b", 2.6);
+  path("M206 444 L215 444 M206 466 L215 466 M205 488 L215 488", null, "#8c738d", 3);
+
+  path("M143 192 C121 178 120 213 137 226 L152 231 M275 192 C298 178 302 210 284 226 L270 230", skin);
+  path("M147 123 Q168 84 213 87 Q264 89 278 135 L278 195 C276 230 249 264 224 277 Q211 284 195 276 C170 263 148 239 144 212 Z", skin);
+  path("M144 139 Q141 165 145 194 C153 178 156 153 163 141 Q161 161 153 169 C177 162 196 145 207 127 Q200 153 186 162 C219 153 236 133 242 120 Q249 148 272 168 L275 205 Q282 189 287 186 L301 151 Q298 109 278 89 C251 59 219 67 204 64 Q158 67 136 103 Q119 131 126 178 Z", hair);
+  path("M136 145 Q148 94 199 82 Q166 106 151 137 Q169 119 182 115 Q161 141 146 157 Z", "#594766", null);
+  path("M234 83 Q274 92 293 139 Q272 126 263 119 Q268 135 272 143 Q252 118 234 83 Z", "#574366", null);
+  path("M134 179 C141 219 146 267 132 311 Q126 330 130 355 Q107 336 112 297 L119 220 Z M289 183 Q280 228 285 263 Q302 305 304 345 Q312 338 316 308 L307 229 Z", hair);
+  path("M129 214 Q139 255 125 303 M296 219 Q285 261 301 303", null, "#594565", 2.2);
+  path("M273 150 L292 134 L297 139 L278 155 Z M279 158 L299 142 L304 148 L284 164 Z", "#e5c18e", "#62465f", 1.6);
+
+  const brows = {
+    neutral: "M156 182 Q169 176 183 183 M237 183 Q250 176 264 182",
+    smile: "M156 180 Q170 172 184 181 M236 181 Q250 172 264 180",
+    frown: "M156 180 Q172 177 184 188 M237 188 Q251 177 264 180",
+  };
+  path(brows[expression], null, "#684957", 2.6);
+  if (expression === "smile") {
+    path("M153 201 Q169 184 188 199 M232 199 Q251 184 267 201", null, "#5a405b", 3.4);
+  } else {
+    path("M152 198 Q170 188 189 198 Q184 215 168 216 Q158 214 152 198 Z M232 198 Q249 188 268 198 Q262 216 248 216 Q237 214 232 198 Z", "#fff4ec", "#775971", 1.7);
+    for (const x of [171, 249]) {
+      ctx.fillStyle = "#5b8d82";
+      ctx.beginPath();
+      ctx.ellipse(x, 202, 8, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#334d48";
+      ctx.beginPath();
+      ctx.ellipse(x + 1, 202, 4.2, 7.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff4f0";
+      ctx.beginPath();
+      ctx.arc(x - 2, 197, 2.9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    path("M152 198 Q169 188 189 198 M232 198 Q249 188 268 198", null, "#4a364f", 3.2);
+  }
+  path("M211 210 L208 228 L215 230", null, "#b57977", 1.55);
+  const mouths = {
+    neutral: ["M198 248 Q210 251 223 247", null],
+    smile: ["M196 244 Q211 251 225 244 Q220 260 210 259 Q201 258 196 244 Z", "#a75a67"],
+    frown: ["M199 252 Q211 244 222 250", null],
+  };
+  path(...mouths[expression], "#854d60", 2);
+  return canvas;
+}
+
+function demoFile(name, settings) {
+  const canvas = demoPortrait(settings);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      canvas.width = 0;
+      canvas.height = 0;
+      if (blob) resolve(new File([blob], name + ".png", { type: "image/png" }));
+      else reject(new Error("Could not create demo image"));
+    }, "image/png");
+  });
+}
+
+function makeDemo() {
+  return Promise.all([
+    demoFile("01_基准·平静"),
+    demoFile("02_微笑", { expression: "smile" }),
+    demoFile("03_皱眉·衣袖变色", { expression: "frown", sleeve: true }),
+    demoFile("04_整体偏移", { shift: 9 }),
+    demoFile("05_画布尺寸不同", { width: 408, height: 520 }),
+    demoFile("06_不透明背景", { opaque: true }),
+  ]);
+}
+
+"use strict";
+
+(() => {
+  const { MAX_BYTES, DEFAULT_SETTINGS, imageHeader, alphaStatus, validRegion, comparePixels, assessment } = SpriteQA;
+  const $ = (id) => document.getElementById(id);
+  const modeButtons = [...document.querySelectorAll("[data-mode]")];
+  const regionInputs = { x: $("region-x"), y: $("region-y"), width: $("region-w"), height: $("region-h") };
+  const nextTask = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const MAX_FILES = 100;
+  const issueLabels = {
+    "unsupported-format": "不支持的格式",
+    "extension-mismatch": "扩展名与内容不符",
+    "invalid-header": "文件头损坏",
+    "file-too-large": "文件超过 64 MiB",
+    "canvas-too-large": "画布超过上限",
+    "animated": "动画格式",
+    "decode-failed": "读取或解码失败",
+    "opaque": "全图不透明",
+    "empty-image": "全图透明",
+    "size-mismatch": "画布尺寸不符",
+    "no-outside-pixels": "区域外无可比像素",
+    "outside-changes": "区域外变化超限",
+  };
+  const statusLabels = { reference: "基准", pass: "通过", review: "复核", error: "异常", pending: "待比较" };
+  const state = {
+    entries: [],
+    reference: null,
+    selected: null,
+    region: null,
+    settings: { ...DEFAULT_SETTINGS },
+    demo: false,
+    busy: false,
+    filter: false,
+    mode: "diff",
+    drawing: false,
+    pointer: null,
+    preview: null,
+    previewError: false,
+    previewVersion: 0,
+    loadingPreview: false,
+  };
+
+  function notify(message = "") {
+    $("notice").textContent = message;
+    $("notice").hidden = !message;
+  }
+
+  function regionFeedback(message = "") {
+    $("region-feedback").textContent = message;
+    $("region-feedback").hidden = !message;
+  }
+
+  function setBusy(busy) {
+    state.busy = busy;
+    if (busy) {
+      state.drawing = false;
+      state.pointer = null;
+      for (const button of $("results").querySelectorAll("button")) button.disabled = true;
+    }
+    renderControls();
+    renderPreview();
+  }
+
+  function renderControls() {
+    const hasReference = Boolean(state.reference);
+    for (const id of ["demo", "import", "delta", "limit"]) $(id).disabled = state.busy;
+    $("base").disabled = state.busy || !state.entries.some((entry) => entry.decoded && !entry.fileIssue);
+    $("draw").disabled = state.busy || !hasReference || !state.preview?.base;
+    $("draw").setAttribute("aria-pressed", String(state.drawing));
+    $("clear-region").disabled = state.busy || !state.region;
+    $("apply-region").disabled = state.busy || !hasReference;
+    $("export").disabled = state.busy || !state.entries.length;
+    $("filter").disabled = state.busy || !state.entries.length;
+    $("filter").setAttribute("aria-pressed", String(state.filter));
+    for (const input of Object.values(regionInputs)) input.disabled = state.busy || !hasReference;
+  }
+
+  function syncRegionInputs() {
+    for (const [key, input] of Object.entries(regionInputs)) input.value = state.region?.[key] ?? "";
+    regionFeedback();
+  }
+
+  function renderReferences() {
+    const select = $("base");
+    const options = [new Option(state.entries.length ? "请选择基准立绘" : "等待导入", "")];
+    for (const entry of state.entries) {
+      if (entry.decoded && !entry.fileIssue) options.push(new Option(entry.label, String(entry.id)));
+    }
+    select.replaceChildren(...options);
+    select.value = state.reference ? String(state.reference.id) : "";
+  }
+
+  function percentage(metric) {
+    return metric.compared ? metric.changed * 100 / metric.compared : null;
+  }
+
+  function formatPercent(metric) {
+    const value = metric && percentage(metric);
+    if (value == null) return "—";
+    if (value > 0 && value < 0.005) return "<0.01%";
+    return value.toFixed(2) + "%";
+  }
+
+  function formatSize(size) {
+    return size ? size.width + " × " + size.height : "—";
+  }
+
+  function renderResults(focusId = null) {
+    const body = $("results");
+    const template = document.createDocumentFragment();
+    const rows = state.entries.filter((entry) => !state.filter || ["review", "error"].includes(entry.status));
+    for (const entry of rows) {
+      const row = document.createElement("tr");
+      row.dataset.status = entry.status;
+      if (entry === state.selected) row.classList.add("is-selected");
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "row-file";
+      button.disabled = state.busy;
+      button.setAttribute("aria-pressed", String(entry === state.selected));
+      button.dataset.entry = entry.id;
+      button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v14H4zM4 16l4.5-4 3.5 3 3-2 5 4M15.5 9.5h.01" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg><span></span>';
+      button.lastElementChild.textContent = entry.label;
+      row.insertCell().append(button);
+
+      const canvasSize = row.insertCell();
+      canvasSize.className = "metric";
+      canvasSize.textContent = formatSize(entry.size);
+      for (const key of ["inside", "outside"]) {
+        const cell = row.insertCell();
+        const metric = entry.comparison?.[key];
+        cell.className = "metric";
+        cell.textContent = formatPercent(metric);
+        if (metric) cell.title = metric.changed.toLocaleString() + " / " + metric.compared.toLocaleString() + " 像素";
+        if (key === "outside" && entry.status === "review") cell.classList.add("metric-alert");
+      }
+      const tag = document.createElement("span");
+      tag.className = "status-tag status-" + entry.status;
+      tag.textContent = entry.issues.length ? entry.issues.map((issue) => issueLabels[issue]).join("、") : statusLabels[entry.status];
+      row.insertCell().append(tag);
+      template.append(row);
+    }
+    body.replaceChildren(template);
+    if (focusId !== null) body.querySelector('[data-entry="' + focusId + '"]')?.focus({ preventScroll: true });
+    $("no-results").hidden = !state.filter || rows.length > 0;
+
+    if (!state.entries.length) {
+      $("summary").textContent = "导入至少两张图片开始对照。";
+    } else if (!state.reference) {
+      $("summary").textContent = state.entries.length + " 张素材 · 请选择一张含透明像素的有效立绘作为基准";
+    } else if (state.entries.length === 1) {
+      $("summary").textContent = "已选定基准，导入包含基准和差分的完整批次开始对照。";
+    } else {
+      const totals = { pass: 0, review: 0, error: 0 };
+      for (const entry of state.entries) {
+        if (entry.status in totals) totals[entry.status]++;
+      }
+      $("summary").textContent = [
+        (state.entries.length - 1) + " 张待检图",
+        totals.pass + " 通过",
+        totals.review + " 复核",
+        totals.error + " 异常",
+      ].join(" · ");
+    }
+  }
+
+  async function withBitmap(entry, use) {
+    const bitmap = await createImageBitmap(entry.file, { imageOrientation: "none" });
+    try {
+      if (bitmap.width !== entry.size.width || bitmap.height !== entry.size.height) {
+        throw new Error("Decoded dimensions differ from image header");
+      }
+      return use(bitmap);
+    } finally {
+      bitmap.close();
+    }
+  }
+
+  function readPixels(bitmap) {
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    try {
+      const ctx = canvas.getContext("2d", { colorSpace: "srgb", willReadFrequently: true });
+      ctx.drawImage(bitmap, 0, 0);
+      return ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    } finally {
+      canvas.width = canvas.height = 0;
+    }
+  }
+
+  async function inspect(entry) {
+    try {
+      if (entry.file.size > MAX_BYTES) {
+        entry.fileIssue = "file-too-large";
+        return;
+      }
+      entry.size = imageHeader(await entry.file.arrayBuffer(), entry.file.name);
+      const alpha = await withBitmap(entry, (bitmap) => alphaStatus(readPixels(bitmap)));
+      entry.decoded = true;
+      entry.fileIssue = alpha === "ok" ? null : alpha;
+    } catch (error) {
+      entry.fileIssue = Object.hasOwn(issueLabels, error.code) ? error.code : "decode-failed";
+    }
+  }
+
+  async function analyze() {
+    let reference = state.reference;
+    let referencePixels;
+    if (reference) {
+      try {
+        referencePixels = await withBitmap(reference, readPixels);
+      } catch {
+        reference.fileIssue = "decode-failed";
+        reference.decoded = false;
+        state.reference = reference = null;
+        state.region = null;
+        notify("基准立绘读取失败。请选择另一张有效的基准，或重新导入该文件。");
+      }
+    }
+    for (const [index, entry] of state.entries.entries()) {
+      entry.comparison = null;
+      entry.issues = entry.fileIssue ? [entry.fileIssue] : [];
+      entry.status = entry.issues.length ? "error" : "pending";
+      if (entry === reference) {
+        entry.status = "reference";
+      } else if (reference && entry.decoded) {
+        const { width, height } = reference.size;
+        if (entry.size.width !== width || entry.size.height !== height) {
+          entry.issues.push("size-mismatch");
+          entry.status = "error";
+        }
+        if (entry.status !== "error") {
+          $("summary").textContent = "正在比较 " + (index + 1) + " / " + state.entries.length + " 张素材…";
+          await nextTask();
+          try {
+            const candidate = await withBitmap(entry, readPixels);
+            const { inside, outside } = comparePixels(referencePixels, candidate, width, height, state.region, state.settings.delta);
+            entry.comparison = { inside, outside };
+            const result = assessment(outside, state.settings.outsideLimit);
+            entry.status = result.status;
+            if (result.issue) entry.issues.push(result.issue);
+          } catch {
+            entry.fileIssue = "decode-failed";
+            entry.decoded = false;
+            entry.issues.push(entry.fileIssue);
+            entry.status = "error";
+          }
+        }
+      }
+    }
+  }
+
+  async function importFiles(files, useDemo = false) {
+    if (state.busy || (!useDemo && files.length === 0)) return;
+    if (files.length > MAX_FILES) {
+      notify("每批最多导入 100 张图片，请把素材分批检查。");
+      return;
+    }
+    notify();
+    setBusy(true);
+    try {
+      if (useDemo) files = await makeDemo();
+      state.demo = useDemo;
+      state.reference = null;
+      state.selected = null;
+      state.preview = null;
+      state.filter = false;
+      state.region = null;
+      state.entries = [];
+      const nameCounts = new Map();
+      for (const file of files) nameCounts.set(file.name, (nameCounts.get(file.name) ?? 0) + 1);
+      state.entries = files.map((file, index) => ({
+        file,
+        id: index + 1,
+        label: nameCounts.get(file.name) > 1 ? file.name + " [" + (index + 1) + "]" : file.name,
+        size: null,
+        decoded: false,
+        fileIssue: null,
+        issues: [],
+        status: "pending",
+        comparison: null,
+      }));
+      $("dataset-label").textContent = useDemo ? "演示素材" : files.length + " 张素材";
+      $("dataset-label").hidden = false;
+      $("results").replaceChildren();
+      renderPreview();
+      for (const [index, entry] of state.entries.entries()) {
+        $("summary").textContent = "正在读取 " + (index + 1) + " / " + state.entries.length + " 张素材…";
+        await nextTask();
+        await inspect(entry);
+      }
+      state.reference = state.entries.find((entry) => entry.decoded && !entry.fileIssue) ?? null;
+      if (useDemo && state.reference) {
+        state.region = { ...DEMO_REGION };
+        state.settings = { ...DEFAULT_SETTINGS };
+        syncSliders();
+      }
+      await analyze();
+      state.selected = (useDemo ? state.entries[2] : state.entries.find((entry) => entry.comparison)) ??
+        state.reference ?? state.entries.find((entry) => entry.decoded) ?? state.entries[0];
+      state.mode = initialMode();
+    } catch {
+      notify("无法加载这批素材，请重新导入。");
+    } finally {
+      finishReview();
+    }
+  }
+
+  function initialMode() {
+    if (state.selected?.comparison) return "diff";
+    return state.selected && state.selected !== state.reference ? "candidate" : "base";
+  }
+
+  function finishReview() {
+    renderReferences();
+    syncRegionInputs();
+    setBusy(false);
+    renderResults();
+    queuePreview();
+  }
+
+  async function rerun() {
+    setBusy(true);
+    try {
+      await analyze();
+      if (!allowedMode(state.mode)) state.mode = initialMode();
+    } finally {
+      finishReview();
+    }
+  }
+
+  function allowedMode(mode) {
+    if (mode === "base") return Boolean(state.reference?.decoded);
+    if (mode === "candidate") return Boolean(state.selected?.decoded && state.selected !== state.reference);
+    return Boolean(state.reference && state.selected?.comparison);
+  }
+
+  function makeCanvas(width, height) {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
+  }
+
+  function viewFromBitmap(bitmap) {
+    const scale = Math.min(1, 1200 / bitmap.width, 1200 / bitmap.height);
+    const view = makeCanvas(Math.max(1, Math.round(bitmap.width * scale)), Math.max(1, Math.round(bitmap.height * scale)));
+    view.getContext("2d").drawImage(bitmap, 0, 0, view.width, view.height);
+    return view;
+  }
+
+  function makeOverlay(mask, width, height, view) {
+    const overlay = makeCanvas(view.width, view.height);
+    const ctx = overlay.getContext("2d");
+    const image = ctx.createImageData(view.width, view.height);
+    const xScale = view.width / width;
+    const yScale = view.height / height;
+    for (let y = 0, index = 0; y < height; y++) {
+      const line = Math.floor(y * yScale) * view.width;
+      for (let x = 0; x < width; x++, index++) {
+        const mark = mask[index];
+        if (!mark) continue;
+        const i = (line + Math.floor(x * xScale)) * 4;
+        if (mark === 1 && image.data[i + 3]) continue;
+        image.data[i] = mark === 1 ? 57 : 255;
+        image.data[i + 1] = mark === 1 ? 227 : 131;
+        image.data[i + 2] = mark === 1 ? 197 : 156;
+        image.data[i + 3] = 239;
+      }
+    }
+    ctx.putImageData(image, 0, 0);
+    return overlay;
+  }
+
+  async function makePreview(reference, candidate, region, delta) {
+    const comparable = Boolean(reference && candidate?.comparison);
+    const base = reference?.decoded ? await withBitmap(reference, (bitmap) => ({
+      view: viewFromBitmap(bitmap),
+      pixels: comparable ? readPixels(bitmap) : null,
+    })) : null;
+    const target = candidate?.decoded && candidate !== reference ? await withBitmap(candidate, (bitmap) => ({
+      view: viewFromBitmap(bitmap),
+      pixels: comparable ? readPixels(bitmap) : null,
+    })) : null;
+    let overlay = null;
+    if (comparable) {
+      const { width, height } = reference.size;
+      const { mask } = comparePixels(base.pixels, target.pixels, width, height, region, delta, true);
+      overlay = makeOverlay(mask, width, height, base.view);
+    }
+    return { base: base?.view ?? null, candidate: target?.view ?? null, overlay };
+  }
+
+  function queuePreview() {
+    state.previewVersion++;
+    state.preview = null;
+    state.previewError = false;
+    renderControls();
+    renderPreview();
+    if (!state.loadingPreview) void loadLatestPreview();
+  }
+
+  async function loadLatestPreview() {
+    state.loadingPreview = true;
+    let version;
+    do {
+      version = state.previewVersion;
+      if (state.busy) break;
+      try {
+        const preview = await makePreview(state.reference, state.selected, state.region, state.settings.delta);
+        if (version === state.previewVersion && !state.busy) state.preview = preview;
+      } catch {
+        if (version === state.previewVersion && !state.busy) state.previewError = true;
+      }
+    } while (version !== state.previewVersion);
+    state.loadingPreview = false;
+    renderControls();
+    renderPreview();
+  }
+
+  function previewSize() {
+    return state.mode === "candidate" ? state.selected?.size : state.reference?.size;
+  }
+
+  function sizeStage() {
+    if ($("stage").hidden) return;
+    const area = $("stage").parentElement;
+    const ratio = $("canvas").width / $("canvas").height;
+    const availableHeight = parseFloat(getComputedStyle(area).minHeight) - 38;
+    const width = Math.max(1, Math.min(area.clientWidth - 38, availableHeight * ratio));
+    $("stage").style.width = width + "px";
+    $("stage").style.height = width / ratio + "px";
+  }
+
+  function renderRegion() {
+    const box = $("region-box");
+    const region = state.pointer?.region ?? state.region;
+    const size = previewSize();
+    const visible = !state.busy && !$("stage").hidden && region && size &&
+      (state.mode !== "candidate" || Boolean(state.selected?.comparison));
+    box.hidden = !visible;
+    if (!visible) return;
+    box.style.left = region.x * 100 / size.width + "%";
+    box.style.top = region.y * 100 / size.height + "%";
+    box.style.width = region.width * 100 / size.width + "%";
+    box.style.height = region.height * 100 / size.height + "%";
+    box.classList.toggle("label-below", region.y < size.height * 0.09);
+  }
+
+  function renderPreview() {
+    for (const button of modeButtons) {
+      button.disabled = state.busy || !allowedMode(button.dataset.mode);
+      button.setAttribute("aria-pressed", String(button.dataset.mode === state.mode));
+    }
+    const preview = state.preview;
+    const view = state.mode === "candidate" ? preview?.candidate : preview?.base;
+    const baseName = state.reference?.label;
+    const targetName = state.selected?.label;
+    $("preview-name").textContent = state.mode === "base" ? (baseName ?? "等待导入立绘") :
+      state.mode === "candidate" ? (targetName ?? "等待导入立绘") :
+      [baseName, targetName].filter(Boolean).join(" ↔ ") || "等待导入立绘";
+    $("preview-name").title = $("preview-name").textContent;
+    $("stage").hidden = !view;
+    $("draw-layer").hidden = !view || !state.drawing;
+    $("legend").hidden = !view || state.mode !== "diff";
+    $("preview-size").textContent = view ? formatSize(previewSize()) + " px" : "";
+    const split = Boolean(view && state.mode === "split");
+    $("split-controls").hidden = !split;
+    $("split-line").hidden = !split;
+    const message = $("preview-message");
+    message.hidden = Boolean(view);
+    if (!view) {
+      message.textContent = state.previewError ? "预览读取失败，请重新导入素材。" :
+        state.busy ? "正在检查素材…" :
+        state.loadingPreview || (state.selected?.decoded && !preview) ? "正在准备预览…" :
+        state.entries.length ? "当前文件没有可预览的图像。" :
+        "从右上角导入素材，或载入演示。";
+      return;
+    }
+    const canvas = $("canvas");
+    canvas.width = view.width;
+    canvas.height = view.height;
+    const ctx = canvas.getContext("2d");
+    if (state.mode === "diff") ctx.globalAlpha = 0.58;
+    ctx.drawImage(view, 0, 0);
+    ctx.globalAlpha = 1;
+    if (state.mode === "diff" && preview.overlay) ctx.drawImage(preview.overlay, 0, 0);
+    if (split) {
+      const position = Number($("split").value);
+      const x = Math.round(position * view.width / 100);
+      const rightWidth = view.width - x;
+      if (rightWidth > 0) {
+        ctx.clearRect(x, 0, rightWidth, view.height);
+        ctx.drawImage(preview.candidate, x, 0, rightWidth, view.height, x, 0, rightWidth, view.height);
+      }
+      $("split-line").style.left = "calc(" + position + "% - 1px)";
+      $("split-line").hidden = position === 0 || position === 100;
+    }
+    sizeStage();
+    renderRegion();
+  }
+
+  function syncSliders() {
+    $("delta").value = state.settings.delta;
+    $("limit").value = state.settings.outsideLimit;
+    $("delta-value").value = $("delta").value + " / 255";
+    $("limit-value").value = (Number($("limit").value) / 100).toFixed(2) + "%";
+  }
+
+  function setRegion(region) {
+    state.region = region;
+    state.drawing = false;
+    state.pointer = null;
+    syncRegionInputs();
+    void rerun();
+  }
+
+  function applyRegionInputs() {
+    if (state.busy || !state.reference) return;
+    const region = Object.fromEntries(Object.entries(regionInputs).map(([key, input]) => [key, input.valueAsNumber]));
+    if (!validRegion(region, state.reference.size.width, state.reference.size.height)) {
+      regionFeedback("请填入整数坐标，确保矩形位于基准画布内，宽和高至少为 1。");
+      return;
+    }
+    setRegion(region);
+  }
+
+  function pointAt(event) {
+    const box = $("draw-layer").getBoundingClientRect();
+    const { width, height } = state.reference.size;
+    return {
+      x: Math.max(0, Math.min(width, (event.clientX - box.left) * width / box.width)),
+      y: Math.max(0, Math.min(height, (event.clientY - box.top) * height / box.height)),
+    };
+  }
+
+  function rectangle(from, to) {
+    const x = Math.floor(Math.min(from.x, to.x));
+    const y = Math.floor(Math.min(from.y, to.y));
+    return {
+      x,
+      y,
+      width: Math.ceil(Math.max(from.x, to.x)) - x,
+      height: Math.ceil(Math.max(from.y, to.y)) - y,
+    };
+  }
+
+  function cancelDrawing() {
+    state.drawing = false;
+    state.pointer = null;
+    regionFeedback();
+    renderControls();
+    renderPreview();
+  }
+
+  function report() {
+    const data = {
+      schemaVersion: 1,
+      referenceId: state.reference?.id ?? null,
+      settings: {
+        pixelDelta: state.settings.delta,
+        maxOutsidePercent: state.settings.outsideLimit / 100,
+        allowedRegion: state.region,
+      },
+      files: state.entries.map((entry) => ({
+        id: entry.id,
+        name: entry.file.name,
+        format: entry.size?.format ?? null,
+        width: entry.size?.width ?? null,
+        height: entry.size?.height ?? null,
+        status: entry.status,
+        issues: entry.issues,
+        comparison: entry.comparison ? Object.fromEntries(Object.entries(entry.comparison).map(([key, metric]) => [
+          key, { ...metric, percent: percentage(metric) },
+        ])) : null,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2) + "\n"], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "sprite-qa-report.json";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+
+  $("import").addEventListener("click", () => $("files").click());
+  $("files").addEventListener("change", (event) => {
+    const files = [...event.target.files];
+    event.target.value = "";
+    void importFiles(files);
+  });
+  $("demo").addEventListener("click", () => void importFiles([], true));
+  $("base").addEventListener("change", (event) => {
+    if (state.busy) return;
+    const previousSize = state.reference?.size;
+    state.reference = state.entries.find((entry) => entry.id === Number(event.target.value)) ?? null;
+    if (state.reference?.size.width !== previousSize?.width || state.reference?.size.height !== previousSize?.height) {
+      state.region = null;
+    }
+    if (!state.reference) state.region = null;
+    if (state.reference === state.selected) state.mode = "base";
+    void rerun();
+  });
+  $("results").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-entry]");
+    if (state.busy || !button) return;
+    state.selected = state.entries.find((entry) => entry.id === Number(button.dataset.entry));
+    if (state.drawing) cancelDrawing();
+    if (!["diff", "split"].includes(state.mode) || !allowedMode(state.mode)) state.mode = initialMode();
+    renderResults(state.selected.id);
+    queuePreview();
+  });
+  $("filter").addEventListener("click", () => {
+    state.filter = !state.filter;
+    renderControls();
+    renderResults();
+  });
+  $("export").addEventListener("click", report);
+  for (const button of modeButtons) {
+    button.addEventListener("click", () => {
+      if (state.drawing) cancelDrawing();
+      state.mode = button.dataset.mode;
+      renderPreview();
+    });
+  }
+  $("split").addEventListener("input", renderPreview);
+  $("delta").addEventListener("input", () => $("delta-value").value = $("delta").value + " / 255");
+  $("limit").addEventListener("input", () => $("limit-value").value = (Number($("limit").value) / 100).toFixed(2) + "%");
+  $("delta").addEventListener("change", () => {
+    state.settings.delta = Number($("delta").value);
+    if (state.reference) void rerun();
+  });
+  $("limit").addEventListener("change", () => {
+    state.settings.outsideLimit = Number($("limit").value);
+    if (state.reference) void rerun();
+  });
+  $("apply-region").addEventListener("click", applyRegionInputs);
+  for (const input of Object.values(regionInputs)) {
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") applyRegionInputs();
+    });
+  }
+  $("clear-region").addEventListener("click", () => setRegion(null));
+  $("draw").addEventListener("click", () => {
+    if (state.drawing) {
+      cancelDrawing();
+      return;
+    }
+    state.drawing = true;
+    state.mode = "base";
+    regionFeedback("在预览中拖动框选。按 Esc 退出。");
+    renderControls();
+    renderPreview();
+    $("stage").scrollIntoView({ block: "nearest" });
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && state.drawing) cancelDrawing();
+  });
+  const drawLayer = $("draw-layer");
+  drawLayer.addEventListener("pointerdown", (event) => {
+    if (!state.drawing || state.pointer || event.button !== 0) return;
+    const from = pointAt(event);
+    state.pointer = { id: event.pointerId, from, region: null };
+    drawLayer.setPointerCapture(event.pointerId);
+  });
+  drawLayer.addEventListener("pointermove", (event) => {
+    if (event.pointerId !== state.pointer?.id) return;
+    state.pointer.region = rectangle(state.pointer.from, pointAt(event));
+    renderRegion();
+  });
+  drawLayer.addEventListener("pointerup", (event) => {
+    if (event.pointerId !== state.pointer?.id) return;
+    const to = pointAt(event);
+    const from = state.pointer.from;
+    state.pointer = null;
+    if (from.x === to.x || from.y === to.y) {
+      renderRegion();
+      return;
+    }
+    const region = rectangle(from, to);
+    state.mode = initialMode();
+    setRegion(region);
+  });
+  for (const name of ["pointercancel", "lostpointercapture"]) {
+    drawLayer.addEventListener(name, (event) => {
+      if (event.pointerId !== state.pointer?.id) return;
+      state.pointer = null;
+      renderRegion();
+    });
+  }
+
+  let dragDepth = 0;
+  const hasFiles = (event) => Array.from(event.dataTransfer?.types ?? []).includes("Files");
+  document.addEventListener("dragenter", (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    dragDepth++;
+    $("drop-zone").hidden = state.busy;
+  });
+  document.addEventListener("dragover", (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = state.busy ? "none" : "copy";
+  });
+  document.addEventListener("dragleave", (event) => {
+    if (!hasFiles(event)) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) $("drop-zone").hidden = true;
+  });
+  document.addEventListener("drop", (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    dragDepth = 0;
+    $("drop-zone").hidden = true;
+    void importFiles([...event.dataTransfer.files]);
+  });
+  new ResizeObserver(sizeStage).observe($("stage").parentElement);
+
+  renderControls();
+  renderPreview();
+})();
+</script>
+</body>
+</html>
