@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src blob: data:; connect-src 'none'; base-uri 'none'; form-action 'none';">
+  <title>Sprite QA · 立绘差分验收</title>
+  <!-- STYLE -->
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none"><path d="M16 5.5 26.5 12 16 18.5 5.5 12 16 5.5Z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="m5.5 16.5 10.5 6.4 10.5-6.4M5.5 21 16 27.4 26.5 21" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span>Sprite<span class="brand-accent"> QA</span></span>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="demo" class="button button-quiet">加载演示</button>
+        <button type="button" id="import" class="button button-primary"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 16v4h16v-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>导入素材</button>
+        <input type="file" id="files" accept=".png,.webp,image/png,image/webp" multiple hidden>
+      </div>
+    </div>
+  </header>
+
+  <main id="workspace">
+    <div class="intro">
+      <div>
+        <h1>立绘差分验收</h1>
+        <p>选定基准立绘，框出允许变化的区域，批量复核其余像素。</p>
+      </div>
+      <span id="dataset-label" class="dataset-label" hidden></span>
+    </div>
+    <p id="notice" class="notice" role="status" hidden></p>
+    <p id="drop-zone" class="drop-zone" hidden>松开鼠标导入 PNG 或 WebP 立绘</p>
+
+    <div class="workspace-grid">
+      <section class="panel preview-panel" aria-labelledby="preview-heading">
+        <header class="panel-header preview-header">
+          <div class="preview-title">
+            <h2 id="preview-heading">对照预览</h2>
+            <p id="preview-name" class="preview-name">等待导入立绘</p>
+          </div>
+          <div class="mode-control" role="group" aria-label="预览方式">
+            <button type="button" data-mode="diff" aria-pressed="true">差分</button>
+            <button type="button" data-mode="split" aria-pressed="false">分屏</button>
+            <button type="button" data-mode="base" aria-pressed="false">基准</button>
+            <button type="button" data-mode="candidate" aria-pressed="false">待检图</button>
+          </div>
+        </header>
+        <div class="preview-area">
+          <div class="preview-guides" aria-hidden="true"></div>
+          <p id="preview-message">从右上角导入素材，或载入演示。</p>
+          <div id="stage" class="stage" hidden>
+            <canvas id="canvas" role="img" aria-label="立绘对照图"></canvas>
+            <span id="split-line" class="split-line" aria-hidden="true" hidden></span>
+            <span id="region-box" class="region-box" aria-hidden="true" hidden><span>允许变化区域</span></span>
+            <div id="draw-layer" class="draw-layer" aria-hidden="true" hidden></div>
+          </div>
+        </div>
+        <div class="split-controls" id="split-controls" hidden>
+          <span>基准</span><input type="range" id="split" min="0" max="100" value="50" aria-label="分屏位置"><span>待检图</span>
+        </div>
+        <footer class="preview-footer">
+          <div id="legend" class="legend"><span><i class="swatch swatch-inside"></i>区域内变化</span><span><i class="swatch swatch-outside"></i>区域外变化</span></div>
+          <span id="preview-size" class="preview-size"></span>
+        </footer>
+      </section>
+
+      <section class="panel rules-panel" aria-labelledby="rules-heading">
+        <header class="panel-header rules-heading">
+          <div class="rules-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 7h14M5 12h14M5 17h14M9 5v4m6 1v4m-5 1v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+          <h2 id="rules-heading">验收规则</h2>
+        </header>
+        <div class="rules-body">
+          <label class="field-title" for="base">基准立绘</label>
+          <select id="base" disabled><option>等待导入</option></select>
+
+          <div class="region-heading">
+            <span id="region-label" class="field-title">允许变化区域</span>
+            <button type="button" id="draw" class="button button-outline" aria-pressed="false" disabled>
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5M12 8v8m-4-4h8" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>框选
+            </button>
+          </div>
+          <div id="region-fields" class="region-fields" role="group" aria-labelledby="region-label">
+            <label>X<input type="number" id="region-x" min="0" step="1" inputmode="numeric" disabled></label>
+            <label>Y<input type="number" id="region-y" min="0" step="1" inputmode="numeric" disabled></label>
+            <label>宽<input type="number" id="region-w" min="1" step="1" inputmode="numeric" disabled></label>
+            <label>高<input type="number" id="region-h" min="1" step="1" inputmode="numeric" disabled></label>
+          </div>
+          <p id="region-feedback" class="field-feedback" aria-live="polite" hidden></p>
+          <div class="region-actions">
+            <button type="button" id="clear-region" class="text-button" disabled>清除区域</button>
+            <button type="button" id="apply-region" class="text-button text-primary" disabled>应用坐标</button>
+          </div>
+
+          <div class="rule-separator"></div>
+          <div class="slider-label">
+            <label class="field-title" for="delta">像素差阈值</label>
+            <output id="delta-value" for="delta">12 / 255</output>
+          </div>
+          <input type="range" id="delta" min="0" max="255" value="12">
+          <div class="slider-label second-slider">
+            <label class="field-title" for="limit">区域外允许变化</label>
+            <output id="limit-value" for="limit">0.25%</output>
+          </div>
+          <input type="range" id="limit" min="0" max="1000" value="25">
+          <p class="rule-hint">区域外变化率以两张图在区域外的可见像素并集为分母。</p>
+        </div>
+      </section>
+
+      <section class="panel results-panel" aria-labelledby="results-heading">
+        <header class="panel-header results-header">
+          <div>
+            <h2 id="results-heading">检查结果</h2>
+            <p id="summary" class="results-summary" role="status">导入至少两张图片开始对照。</p>
+          </div>
+          <div class="result-actions">
+            <button type="button" id="filter" class="button button-outline" aria-pressed="false" disabled>仅待处理</button>
+            <button type="button" id="export" class="button button-outline" disabled><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v12m-4-4 4 4 4-4M4 17v3h16v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>导出 JSON</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">文件</th><th scope="col">画布</th><th scope="col">区域内变化</th><th scope="col">区域外变化</th><th scope="col">状态</th></tr></thead>
+            <tbody id="results"></tbody>
+          </table>
+          <p id="no-results" class="no-results" hidden>当前没有需要处理的文件。</p>
+        </div>
+      </section>
+    </div>
+
+    <footer class="page-footer">
+      <span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>素材仅在当前浏览器中处理</span>
+      <span>PNG / WebP</span>
+    </footer>
+  </main>
+  <!-- SCRIPT -->
+</body>
+</html>
